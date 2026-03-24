@@ -18,6 +18,7 @@ fluvio topic create zeek-trace
 echo "[E2E] Creating Zeek Intercept Script..."
 cat << 'EOF' > tests/test_e2e.zeek
 @load base/protocols/conn
+@load Zeek/Fluvio
 redef Fluvio::default_topic_name = "zeek-trace";
 redef Fluvio::send_all_active_logs = T;
 EOF
