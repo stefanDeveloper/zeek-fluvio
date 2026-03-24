@@ -50,31 +50,5 @@ jobs:
 
     - name: End-to-End Log Serialization Integration Test
       run: |
-        export PATH="$HOME/.fluvio/bin:/opt/zeek/bin:$PATH"
-        export ZEEK_PLUGIN_PATH=${GITHUB_WORKSPACE}/build
-        fluvio topic create zeek-conn || true
-
-        # Generate a dummy pcap to trigger connection logs
-        ping -c 3 8.8.8.8 & 
-        PID=$!
-        sudo tcpdump -i any icmp -c 3 -w tests/Traces/ping.pcap
-        wait $PID
-
-        echo '
-        @load base/protocols/conn
-        redef Fluvio::default_topic_name = "zeek-conn";
-        event zeek_init() {
-            Log::add_filter(Conn::LOG, [
-                $name="fluvio-conn",
-                $writer=Log::WRITER_FLUVIOWRITER
-            ]);
-        }
-        ' > test_fluvio.zeek
-        
-        zeek -r tests/Traces/ping.pcap test_fluvio.zeek
-        sleep 2
-        
-        fluvio consume zeek-conn -B -d > consumed.txt
-        cat consumed.txt
-        # Validate JSON payload mapping occurred properly
-        grep -q "id.orig_h" consumed.txt
+        # Utilize the uploaded static pre-recorded PCAP capture to avoid dynamic interface generation issues!
+        ./tests/e2e.sh capture.pcap
