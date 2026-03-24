@@ -51,4 +51,4 @@ jobs:
     - name: End-to-End Log Serialization Integration Test
       run: |
         # Utilize the uploaded static pre-recorded PCAP capture to avoid dynamic interface generation issues!
-        ./tests/e2e.sh capture.pcap
+        bash ./tests/e2e.sh capture.pcap
