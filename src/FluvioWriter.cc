@@ -1,11 +1,12 @@
 #include "FluvioWriter.h"
 #include "fluvio.bif.h"
+#include <zeek/Desc.h>
 
 namespace logging {
 namespace writer {
 
-FluvioWriter::FluvioWriter(WriterFrontend* frontend) : WriterBackend(frontend), client(nullptr), producer(nullptr) {
-    formatter = new threading::formatter::JSON(this, threading::formatter::JSON::TS_EPOCH);
+FluvioWriter::FluvioWriter(zeek::logging::WriterFrontend* frontend) : zeek::logging::WriterBackend(frontend), client(nullptr), producer(nullptr) {
+    formatter = new zeek::threading::formatter::JSON(this, zeek::threading::formatter::JSON::TS_EPOCH);
 }
 
 FluvioWriter::~FluvioWriter() {
@@ -18,7 +19,7 @@ FluvioWriter::~FluvioWriter() {
     }
 }
 
-bool FluvioWriter::DoInit(const WriterInfo& info, int num_fields, const threading::Field* const* fields) {
+bool FluvioWriter::DoInit(const zeek::logging::WriterBackend::WriterInfo& info, int num_fields, const zeek::threading::Field* const* fields) {
     topic_name = info.path;
 
     if (fluvio_c_connect(&client) != 0) {
@@ -35,10 +36,10 @@ bool FluvioWriter::DoInit(const WriterInfo& info, int num_fields, const threadin
     return true;
 }
 
-bool FluvioWriter::DoWrite(int num_fields, const threading::Field* const* fields, threading::Value** vals) {
+bool FluvioWriter::DoWrite(int num_fields, const zeek::threading::Field* const* fields, zeek::threading::Value** vals) {
     if (!producer) return false;
 
-    ODesc desc;
+    zeek::ODesc desc;
     formatter->Describe(&desc, num_fields, fields, vals);
     
     std::string payload = desc.Description();

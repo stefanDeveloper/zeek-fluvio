@@ -6,10 +6,10 @@ namespace Zeek_Fluvio {
 
 Plugin plugin;
 
-plugin::Configuration Plugin::Configure() {
-    AddComponent(new ::logging::Component("FluvioWriter", ::logging::writer::FluvioWriter::Instantiate));
+zeek::plugin::Configuration Plugin::Configure() {
+    AddComponent(new ::zeek::logging::Component("FluvioWriter", ::logging::writer::FluvioWriter::Instantiate));
 
-    plugin::Configuration config;
+    zeek::plugin::Configuration config;
     config.name = "Zeek::Fluvio";
     config.description = "Writes Zeek logs to Fluvio Streams";
     config.version.major = 0;
