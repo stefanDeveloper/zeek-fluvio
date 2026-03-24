@@ -1,0 +1,11 @@
+#!/bin/sh
+ZEEK_CONFIG=${ZEEK_CONFIG:-zeek-config}
+
+if [ ! -x "$(command -v $ZEEK_CONFIG)" ]; then
+    echo "Error: $ZEEK_CONFIG not found in PATH."
+    exit 1
+fi
+
+CMAKE_DIR=$($ZEEK_CONFIG --cmake_dir)
+
+cmake -B build -S . -DCMAKE_MODULE_PATH="$CMAKE_DIR" "$@"

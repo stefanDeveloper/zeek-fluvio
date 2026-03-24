@@ -1,0 +1,80 @@
+name: Zeek Plugin CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Runtime Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake g++ wget curl tcpdump
+
+    - name: Install Zeek
+      run: |
+        echo 'deb http://download.opensuse.org/repositories/security:/zeek/xUbuntu_22.04/ /' | sudo tee /etc/apt/sources.list.d/security:zeek.list
+        curl -fsSL https://download.opensuse.org/repositories/security:zeek/xUbuntu_22.04/Release.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/security_zeek.gpg > /dev/null
+        sudo apt-get update
+        sudo apt-get install -y zeek zeek-dev
+        echo "/opt/zeek/bin" >> $GITHUB_PATH
+
+    - name: Install Fluvio Local Cluster
+      run: |
+        curl -fsS https://hub.infinyon.cloud/install/install.sh | bash
+        echo "$HOME/.fluvio/bin" >> $GITHUB_PATH
+
+    - name: Start Fluvio Cluster
+      run: |
+        export PATH="$HOME/.fluvio/bin:$PATH"
+        fluvio cluster start --local
+
+    - name: Configure and Compile Plugin
+      run: |
+        export PATH="/opt/zeek/bin:$PATH"
+        ./configure
+        make -C build
+
+    - name: Run BTest Suite
+      run: |
+        export PATH="/opt/zeek/bin:$PATH"
+        export ZEEK_PLUGIN_PATH=${GITHUB_WORKSPACE}/build
+        cd tests
+        btest -j 4
+
+    - name: End-to-End Log Serialization Integration Test
+      run: |
+        export PATH="$HOME/.fluvio/bin:/opt/zeek/bin:$PATH"
+        export ZEEK_PLUGIN_PATH=${GITHUB_WORKSPACE}/build
+        fluvio topic create zeek-conn || true
+
+        # Generate a dummy pcap to trigger connection logs
+        ping -c 3 8.8.8.8 & 
+        PID=$!
+        sudo tcpdump -i any icmp -c 3 -w tests/Traces/ping.pcap
+        wait $PID
+
+        echo '
+        @load base/protocols/conn
+        redef Fluvio::default_topic = "zeek-conn";
+        event zeek_init() {
+            Log::add_filter(Conn::LOG, [
+                $name="fluvio-conn",
+                $writer=Log::WRITER_FLUVIOWRITER
+            ]);
+        }
+        ' > test_fluvio.zeek
+        
+        zeek -r tests/Traces/ping.pcap test_fluvio.zeek
+        sleep 2
+        
+        fluvio consume zeek-conn -B -d > consumed.txt
+        cat consumed.txt
+        # Validate JSON payload mapping occurred properly
+        grep -q "id.orig_h" consumed.txt

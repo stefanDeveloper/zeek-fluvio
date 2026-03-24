@@ -1,0 +1,6 @@
+[package]
+name = zeek-fluvio
+description = A Zeek log writer plugin bridging telemetry payloads seamlessly into Fluvio streams.
+version = 0.1.0
+script_dir = scripts
+build_command = ./configure --zeek-dist=%(zeek_dist)s && make -C build
