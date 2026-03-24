@@ -1,3 +1,0 @@
-module Fluvio;
-
-const default_topic: string;
