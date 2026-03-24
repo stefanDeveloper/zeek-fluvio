@@ -5,7 +5,7 @@ include(ZeekPlugin)
 include(FetchContent)
 FetchContent_Declare(
   fluvio_client_cpp
-  URL https://github.com/stefanDeveloper/fluvio-client-cpp/releases/download/v0.0.1/fluvio-client-cpp-linux-x64.tar.gz
+  URL https://github.com/stefanDeveloper/fluvio-client-cpp/releases/download/v0.0.2/fluvio-client-cpp-linux-x64.tar.gz
 )
 FetchContent_MakeAvailable(fluvio_client_cpp)
 find_package(fluvio_client_cpp CONFIG REQUIRED PATHS ${fluvio_client_cpp_SOURCE_DIR})
