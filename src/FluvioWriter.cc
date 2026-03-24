@@ -1,5 +1,4 @@
 #include "FluvioWriter.h"
-#include "fluvio.bif.h"
 #include <zeek/Desc.h>
 
 namespace logging {
