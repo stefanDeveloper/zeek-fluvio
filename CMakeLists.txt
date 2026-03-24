@@ -10,6 +10,9 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fluvio_client_cpp)
 find_package(fluvio_client_cpp CONFIG REQUIRED PATHS ${fluvio_client_cpp_SOURCE_DIR})
 
+get_target_property(FLUVIO_INC fluvio_client_cpp::fluvio_client_cpp INTERFACE_INCLUDE_DIRECTORIES)
+include_directories(BEFORE ${FLUVIO_INC})
+
 zeek_plugin_begin(ZEEK FLUVIO)
 zeek_plugin_cc(src/Plugin.cc)
 zeek_plugin_cc(src/FluvioWriter.cc)
