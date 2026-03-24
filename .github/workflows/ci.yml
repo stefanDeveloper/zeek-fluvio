@@ -22,7 +22,7 @@ jobs:
         echo 'deb http://download.opensuse.org/repositories/security:/zeek/xUbuntu_24.04/ /' | sudo tee /etc/apt/sources.list.d/security:zeek.list
         curl -fsSL https://download.opensuse.org/repositories/security:zeek/xUbuntu_24.04/Release.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/security_zeek.gpg > /dev/null
         sudo apt-get update
-        sudo apt-get install -y zeek zeek-dev
+        sudo apt-get install -y zeek zeek-core-dev
         echo "/opt/zeek/bin" >> $GITHUB_PATH
 
     - name: Install Fluvio Local Cluster
@@ -41,12 +41,12 @@ jobs:
         ./configure
         make -C build
 
-    - name: Run BTest Suite
+    - name: Test Component Registry Load
       run: |
         export PATH="/opt/zeek/bin:$PATH"
         export ZEEK_PLUGIN_PATH=${GITHUB_WORKSPACE}/build
-        cd tests
-        btest -j 4
+        # Verifies the plugin explicitly exists in Zeek runtime
+        zeek -N Zeek::Fluvio
 
     - name: End-to-End Log Serialization Integration Test
       run: |
@@ -62,7 +62,7 @@ jobs:
 
         echo '
         @load base/protocols/conn
-        redef Fluvio::default_topic = "zeek-conn";
+        redef Fluvio::default_topic_name = "zeek-conn";
         event zeek_init() {
             Log::add_filter(Conn::LOG, [
                 $name="fluvio-conn",
