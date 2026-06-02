@@ -1,6 +1,6 @@
 # Zeek-Fluvio Plugin
 
-A high-performance Zeek log writer plugin that bridges telemetry payloads seamlessly into **Fluvio** streams. Built natively on the [Fluvio C++ Client](https://github.com/infinyon/fluvio-client-cpp), this plugin ensures low-latency data ingestion for security operations and network analysis.
+A high-performance Zeek log writer plugin that bridges telemetry payloads seamlessly into **Fluvio** streams. Built natively on the [Fluvio C++ Client](https://github.com/stefanDeveloper/fluvio-client-cpp), this plugin ensures low-latency data ingestion for security operations and network analysis.
 
 ## 🚀 Features
 
@@ -24,9 +24,9 @@ zkg install zeek-fluvio
 If you prefer to build from source:
 
 ```bash
-git clone https://github.com/infinyon/zeek-fluvio
+git clone https://github.com/stefanDeveloper/zeek-fluvio.git
 cd zeek-fluvio
-./configure --zeek-dist=/path/to/zeek/source
+./configure
 make -C build
 sudo make -C build install
 ```

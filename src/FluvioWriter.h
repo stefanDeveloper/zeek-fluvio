@@ -1,4 +1,6 @@
 #pragma once
+#include "rust/cxx.h"
+#include "fluvio-client-cpp/src/lib.rs.h"
 #include <zeek/logging/WriterBackend.h>
 #include <zeek/threading/formatters/JSON.h>
 #include <fluvio.h>
@@ -27,8 +29,8 @@ protected:
 
 private:
     zeek::threading::formatter::JSON* formatter;
-    fluvio_client_t* client;
-    fluvio_topic_producer_t* producer;
+    std::optional<rust::Box<Fluvio>> client;
+    std::optional<rust::Box<TopicProducerPool>> producer;
     std::string topic_name;
 };
 

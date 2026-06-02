@@ -4,30 +4,29 @@
 namespace logging {
 namespace writer {
 
-FluvioWriter::FluvioWriter(zeek::logging::WriterFrontend* frontend) : zeek::logging::WriterBackend(frontend), client(nullptr), producer(nullptr) {
+FluvioWriter::FluvioWriter(zeek::logging::WriterFrontend* frontend) : zeek::logging::WriterBackend(frontend) {
     formatter = new zeek::threading::formatter::JSON(this, zeek::threading::formatter::JSON::TS_EPOCH);
 }
 
 FluvioWriter::~FluvioWriter() {
     delete formatter;
-    if (producer) {
-        fluvio_c_producer_free(producer);
-    }
-    if (client) {
-        fluvio_c_client_free(client);
-    }
 }
 
 bool FluvioWriter::DoInit(const zeek::logging::WriterBackend::WriterInfo& info, int num_fields, const zeek::threading::Field* const* fields) {
     topic_name = info.path;
 
-    if (fluvio_c_connect(&client) != 0) {
-        Error("Failed to connect to Fluvio Cluster");
+    try {
+        this->client = Fluvio::connect();
+    } catch (const std::exception& e) {
+        std::string err = std::string("Failed to connect to Fluvio: ") + e.what();
+        Error(err.c_str());
         return false;
     }
 
-    if (fluvio_c_create_producer(client, topic_name.c_str(), &producer) != 0) {
-        std::string err = "Failed to instantiate producer for topic: " + topic_name;
+    try {
+        this->producer = (*this->client)->topic_producer(topic_name);
+    } catch (const std::exception& e) {
+        std::string err = std::string("Failed to create producer for topic '") + topic_name + "': " + e.what();
         Error(err.c_str());
         return false;
     }
@@ -36,16 +35,19 @@ bool FluvioWriter::DoInit(const zeek::logging::WriterBackend::WriterInfo& info, 
 }
 
 bool FluvioWriter::DoWrite(int num_fields, const zeek::threading::Field* const* fields, zeek::threading::Value** vals) {
-    if (!producer) return false;
+    if (!this->producer) return false;
 
     zeek::ODesc desc;
-    formatter->Describe(&desc, num_fields, fields, vals);
+    this->formatter->Describe(&desc, num_fields, fields, vals);
     
     std::string payload = desc.Description();
-    if (fluvio_c_producer_send(producer, nullptr, 0, (const uint8_t*)payload.data(), payload.size(), nullptr) != 0) {
-        Warning("Dropped record due to internal queue/send limits");
-        return false;
-    }
+    auto out = (*this->producer)->send(
+        rust::Slice<const uint8_t>(nullptr, 0),
+        rust::Slice<const uint8_t>(
+            reinterpret_cast<const uint8_t*>(payload.data()),
+            payload.size()
+        )
+    );
 
     return true;
 }
@@ -54,12 +56,13 @@ bool FluvioWriter::DoSetBuf(bool enabled) { return true; }
 bool FluvioWriter::DoRotate(const char* rotated_path, double open, double close, bool terminating) { return true; }
 
 bool FluvioWriter::DoFlush(double network_time) {
-    if (producer) fluvio_c_producer_flush(producer);
+    if (!this->producer) return false;
+    (*this->producer)->flush();
     return true;
 }
 
 bool FluvioWriter::DoFinish(double network_time) {
-    if (producer) fluvio_c_producer_flush(producer);
+    if (this->producer) (*this->producer)->flush();
     return true;
 }
 
