@@ -1,0 +1,67 @@
+name: Zeek Plugin CI for TLS support
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Runtime Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake g++ wget curl tcpdump libssl-dev openssl
+
+    - name: Install Zeek
+      run: |
+        echo 'deb http://download.opensuse.org/repositories/security:/zeek/xUbuntu_24.04/ /' | sudo tee /etc/apt/sources.list.d/security:zeek.list
+        curl -fsSL https://download.opensuse.org/repositories/security:zeek/xUbuntu_24.04/Release.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/security_zeek.gpg > /dev/null
+        sudo apt-get update
+        sudo apt-get install -y zeek zeek-core-dev
+        echo "/opt/zeek/bin" >> $GITHUB_PATH
+
+    - name: Install Fluvio Local Cluster
+      run: |
+        curl -fsS https://raw.githubusercontent.com/fluvio-community/fluvio/master/install.sh | FVM_VERSION=dev bash
+        echo "$HOME/.fluvio/bin" >> $GITHUB_PATH
+
+    - name: Generate mTLS Certificates for Testing
+      run: |
+        mkdir -p /tmp/certs && cd /tmp/certs
+        openssl req -x509 -new -nodes -newkey rsa:2048 -keyout ca.key -out ca.crt -days 3650 -subj '/CN=fluvio-ca' -extensions v3_ca -config <(printf "[req]\ndistinguished_name=dn\n[dn]\n[v3_ca]\nbasicConstraints=CA:TRUE\nkeyUsage=keyCertSign,cRLSign")
+        openssl req -new -newkey rsa:2048 -nodes -keyout server.key -out server.csr -subj '/CN=localhost'
+        openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 365 -extfile <(printf "subjectAltName=DNS:localhost,DNS:custom-spu-5001.localhost,IP:127.0.0.1\nbasicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth")
+        openssl req -new -newkey rsa:2048 -nodes -keyout client.key -out client.csr -subj '/CN=fluvio-client'
+        openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out client.crt -days 365 -extfile <(printf "subjectAltName=DNS:localhost,IP:127.0.0.1\nbasicConstraints=CA:FALSE\nextendedKeyUsage=clientAuth")
+
+    - name: Start Fluvio Cluster
+      run: |
+        export PATH="$HOME/.fluvio/bin:$PATH"
+        fluvio cluster start --local --tls --server-cert /tmp/certs/server.crt --server-key /tmp/certs/server.key --client-cert /tmp/certs/client.crt --client-key /tmp/certs/client.key --ca-cert /tmp/certs/ca.crt --domain localhost
+
+    - name: Configure and Compile Plugin
+      run: |
+        export PATH="/opt/zeek/bin:$PATH"
+        ./configure
+        make -C build
+
+    - name: Test Component Registry Load
+      run: |
+        export PATH="/opt/zeek/bin:$PATH"
+        export ZEEK_PLUGIN_PATH=${GITHUB_WORKSPACE}/build
+        # Verifies the plugin explicitly exists in Zeek runtime
+        zeek -N Zeek::Fluvio
+
+    - name: End-to-End Log Serialization Integration Test
+      run: |
+        export FLUVIO_TLS_DOMAIN=localhost
+        export FLUVIO_TLS_KEY=/tmp/certs/client.key
+        export FLUVIO_TLS_CERT=/tmp/certs/client.crt
+        export FLUVIO_TLS_CA=/tmp/certs/ca.crt
+        # Utilize the uploaded static pre-recorded PCAP capture to avoid dynamic interface generation issues!
+        bash ./tests/e2e.sh tests/Traces/ping.pcap

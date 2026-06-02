@@ -15,8 +15,23 @@ FluvioWriter::~FluvioWriter() {
 bool FluvioWriter::DoInit(const zeek::logging::WriterBackend::WriterInfo& info, int num_fields, const zeek::threading::Field* const* fields) {
     topic_name = info.path;
 
+    const char* domain = std::getenv("FLUVIO_TLS_DOMAIN");
+    const char* key = std::getenv("FLUVIO_TLS_KEY");
+    const char* cert = std::getenv("FLUVIO_TLS_CERT");
+    const char* ca = std::getenv("FLUVIO_TLS_CA");
+
+    auto fluvioConfig = FluvioConfig::create("localhost:9003");
+
+    if (domain && key && cert && ca) {
+        Info("Active TLS parameters detected! Configuring strict mTLS execution pipeline.");
+        fluvioConfig->set_tls_file_paths(domain, key, cert, ca);
+    } else {
+        Warning("No TLS parameters detected in ENV. Proceeding with TLS-Disabled configuration.");
+        fluvioConfig->disable_tls();
+    }
+
     try {
-        this->client = Fluvio::connect();
+        this->client = Fluvio::connect_with_config(*fluvioConfig);
     } catch (const std::exception& e) {
         std::string err = std::string("Failed to connect to Fluvio: ") + e.what();
         Error(err.c_str());
